@@ -107,7 +107,8 @@ type Tag = (typeof TAGS)[number];
 const tagOf = (ipu: number): Tag => TAGS.find((t) => ipu <= t.max) ?? TAGS[TAGS.length - 1];
 
 const DOE = "https://eqms.doe.gov.my/api3";
-const SB_URL = process.env.SUPABASE_URL?.replace(/\/$/, "");
+// Accept either the project URL or the Data API URL (…/rest/v1/) as pasted from the Supabase dashboard.
+const SB_URL = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ARCHIVE_ON = Boolean(SB_URL && SB_KEY);
 const HOUR = 3_600_000;
