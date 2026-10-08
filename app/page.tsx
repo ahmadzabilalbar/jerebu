@@ -309,32 +309,27 @@ const SITE_URL =
   process.env.SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
 
-/** Puts the current IPU into the shared-link title, description and image. */
+/** Puts the current IPU into the shared-link title and image. No description, to keep previews short. */
 export async function generateMetadata(): Promise<Metadata> {
   const stations = await getStations().catch(() => [] as Station[]);
   const now = AREAS.flatMap((a) => {
     const st = stations.find((x) => x.id === a.stationId);
     return st?.ipu != null ? [{ name: a.name, ipu: st.ipu, tag: tagOf(st.ipu), time: st.time }] : [];
   });
-  const base = { metadataBase: new URL(SITE_URL), twitter: { card: "summary_large_image" as const } };
+  // description: null also drops the layout's default description from the preview.
+  const base = { metadataBase: new URL(SITE_URL), description: null, twitter: { card: "summary_large_image" as const } };
   if (now.length === 0) {
-    return { ...base, title: "Jerebu Watch · IPU Alor Setar & Kangar", description: "Hourly Air Pollutant Index (IPU) from official DOE stations." };
+    return { ...base, title: "IPU Alor Setar · Kangar" };
   }
   const time = now.map((n) => n.time).find(Boolean);
-  const title = `${now.map((n) => `${n.tag.dot} ${n.name} ${n.ipu}`).join(" · ")} — IPU now`;
-  const description = [
-    [...new Set(now.map((n) => `${n.tag.ms} (${n.tag.en})`))].join(" / "),
-    time ? `reading at ${fmtDayTime(time)} MYT` : null,
-    "Official DOE APIMS data, updated hourly.",
-  ].filter(Boolean).join(" · ");
+  const title = `IPU ${now.map((n) => `${n.tag.dot} ${n.name} ${n.ipu}`).join(" · ")}`;
   // The hour stamp changes the image URL every hour so chat apps don't reuse a stale cached image.
   const image = { url: `/og?h=${time ? toMytHour(time).slice(0, 13) : "now"}`, width: 1200, height: 630, alt: title };
   return {
     ...base,
     title,
-    description,
-    openGraph: { title, description, type: "website", siteName: "Jerebu Watch", locale: "ms_MY", images: [image] },
-    twitter: { ...base.twitter, title, description, images: [image.url] },
+    openGraph: { title, type: "website", siteName: "Jerebu Watch", locale: "ms_MY", images: [image] },
+    twitter: { ...base.twitter, title, images: [image.url] },
   };
 }
 
