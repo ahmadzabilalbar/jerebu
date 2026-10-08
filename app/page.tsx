@@ -48,6 +48,7 @@
  *   npm i && npm run dev        → http://localhost:3000
  *   push to GitHub → import in Vercel → (optional) add the two env vars → deploy.
  */
+import type { Metadata } from "next";
 import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -77,27 +78,27 @@ type Range = (typeof RANGES)[number];
 /** DOE IPU rating scale (Indeks Pencemaran Udara). */
 const TAGS = [
   {
-    key: "good", en: "Good", ms: "Baik", min: 0, max: 50, color: "#2563eb",
+    key: "good", en: "Good", ms: "Baik", dot: "🔵", min: 0, max: 50, color: "#2563eb",
     badge: "bg-blue-50 text-blue-800 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/30",
     advice: "Low pollution. No ill effects on health.",
   },
   {
-    key: "moderate", en: "Moderate", ms: "Sederhana", min: 51, max: 100, color: "#16a34a",
+    key: "moderate", en: "Moderate", ms: "Sederhana", dot: "🟢", min: 51, max: 100, color: "#16a34a",
     badge: "bg-green-50 text-green-800 ring-green-200 dark:bg-green-500/15 dark:text-green-200 dark:ring-green-400/30",
     advice: "Moderate pollution. No ill effects for healthy people.",
   },
   {
-    key: "unhealthy", en: "Unhealthy", ms: "Tidak Sihat", min: 101, max: 200, color: "#eab308",
+    key: "unhealthy", en: "Unhealthy", ms: "Tidak Sihat", dot: "🟡", min: 101, max: 200, color: "#eab308",
     badge: "bg-yellow-50 text-yellow-900 ring-yellow-300 dark:bg-yellow-400/15 dark:text-yellow-200 dark:ring-yellow-400/30",
     advice: "Mild aggravation for people with heart or lung disease. Reduce prolonged outdoor exertion.",
   },
   {
-    key: "very-unhealthy", en: "Very Unhealthy", ms: "Sangat Tidak Sihat", min: 201, max: 300, color: "#ea580c",
+    key: "very-unhealthy", en: "Very Unhealthy", ms: "Sangat Tidak Sihat", dot: "🟠", min: 201, max: 300, color: "#ea580c",
     badge: "bg-orange-50 text-orange-900 ring-orange-300 dark:bg-orange-500/15 dark:text-orange-200 dark:ring-orange-400/30",
     advice: "Significant aggravation. Children, the elderly and those with heart or lung disease should stay indoors.",
   },
   {
-    key: "hazardous", en: "Hazardous", ms: "Berbahaya", min: 301, max: Infinity, color: "#dc2626",
+    key: "hazardous", en: "Hazardous", ms: "Berbahaya", dot: "🔴", min: 301, max: Infinity, color: "#dc2626",
     badge: "bg-red-50 text-red-800 ring-red-200 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-400/30",
     advice: "Serious risk. Everyone should avoid outdoor activity and keep doors and windows closed.",
   },
@@ -300,6 +301,41 @@ async function archiveStatus(): Promise<ArchiveStatus | null> {
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/* ═══════════════════════════════ LINK PREVIEW (WhatsApp, Telegram, Facebook…) ═══════════════════════════════ */
+
+const SITE_URL =
+  process.env.SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
+/** Puts the current IPU into the shared-link title, description and image. */
+export async function generateMetadata(): Promise<Metadata> {
+  const stations = await getStations().catch(() => [] as Station[]);
+  const now = AREAS.flatMap((a) => {
+    const st = stations.find((x) => x.id === a.stationId);
+    return st?.ipu != null ? [{ name: a.name, ipu: st.ipu, tag: tagOf(st.ipu), time: st.time }] : [];
+  });
+  const base = { metadataBase: new URL(SITE_URL), twitter: { card: "summary_large_image" as const } };
+  if (now.length === 0) {
+    return { ...base, title: "Jerebu Watch · IPU Alor Setar & Kangar", description: "Hourly Air Pollutant Index (IPU) from official DOE stations." };
+  }
+  const time = now.map((n) => n.time).find(Boolean);
+  const title = `${now.map((n) => `${n.tag.dot} ${n.name} ${n.ipu}`).join(" · ")} — IPU now`;
+  const description = [
+    [...new Set(now.map((n) => `${n.tag.ms} (${n.tag.en})`))].join(" / "),
+    time ? `reading at ${fmtDayTime(time)} MYT` : null,
+    "Official DOE APIMS data, updated hourly.",
+  ].filter(Boolean).join(" · ");
+  // The hour stamp changes the image URL every hour so chat apps don't reuse a stale cached image.
+  const image = { url: `/og?h=${time ? toMytHour(time).slice(0, 13) : "now"}`, width: 1200, height: 630, alt: title };
+  return {
+    ...base,
+    title,
+    description,
+    openGraph: { title, description, type: "website", siteName: "Jerebu Watch", locale: "ms_MY", images: [image] },
+    twitter: { ...base.twitter, title, description, images: [image.url] },
+  };
 }
 
 /* ═══════════════════════════════ PAGE ═══════════════════════════════ */
