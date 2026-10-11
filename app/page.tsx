@@ -309,6 +309,10 @@ const SITE_URL =
   process.env.SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
 
+/** "IPU 🟢 Alor Setar 96 · 🟢 Kangar 92", shared by the link preview and the WhatsApp share button. */
+const ipuHeadline = (items: { name: string; ipu: number }[]) =>
+  `IPU ${items.map((n) => `${tagOf(n.ipu).dot} ${n.name} ${n.ipu}`).join(" · ")}`;
+
 /** Puts the current IPU into the shared-link title and image. No description, to keep previews short. */
 export async function generateMetadata(): Promise<Metadata> {
   const stations = await getStations().catch(() => [] as Station[]);
@@ -322,7 +326,7 @@ export async function generateMetadata(): Promise<Metadata> {
     return { ...base, title: "IPU Alor Setar · Kangar" };
   }
   const time = now.map((n) => n.time).find(Boolean);
-  const title = `IPU ${now.map((n) => `${n.tag.dot} ${n.name} ${n.ipu}`).join(" · ")}`;
+  const title = ipuHeadline(now);
   // The hour stamp changes the image URL every hour so chat apps don't reuse a stale cached image.
   const image = { url: `/og?h=${time ? toMytHour(time).slice(0, 13) : "now"}`, width: 1200, height: 630, alt: title };
   return {
@@ -406,6 +410,14 @@ export default async function Page({ searchParams }: PageProps<"/">) {
   const counts = TAGS.map((t) => ({ tag: t, n: series.filter((r) => tagOf(r.ipu).key === t.key).length }));
   const tableRows = [...series].reverse().filter((r) => !s.tag || tagOf(r.ipu).key === s.tag);
 
+  const current = areaInfo.flatMap((a) => (a.ipu !== null ? [{ name: a.area.name, ipu: a.ipu }] : []));
+  const shareText = [
+    current.length ? ipuHeadline(current) : "IPU Alor Setar · Kangar",
+    latestTime ? `Bacaan ${fmtDayTime(latestTime)} MYT` : null,
+    `${SITE_URL}/`,
+  ].filter(Boolean).join("\n");
+  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+
   const href = (over: Partial<Search>) => {
     const p = new URLSearchParams(Object.entries({ ...s, ...over }).filter(([, v]) => v) as [string, string][]);
     return `?${p.toString()}`;
@@ -422,12 +434,24 @@ export default async function Page({ searchParams }: PageProps<"/">) {
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Air Pollutant Index (IPU)</h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Alor Setar · Kangar, updated hourly from official DOE stations</p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
-            </span>
-            {latestTime ? <>DOE reading at <b className="font-semibold text-slate-900 dark:text-slate-100">{fmtDayTime(latestTime)}</b> MYT</> : "Waiting for data"}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span className="relative flex size-2.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+              </span>
+              {latestTime ? <>DOE reading at <b className="font-semibold text-slate-900 dark:text-slate-100">{fmtDayTime(latestTime)}</b> MYT</> : "Waiting for data"}
+            </div>
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={shareText}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-3.5 py-2 text-sm font-semibold text-[#073b1d] transition hover:bg-[#1ebe5b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366]"
+            >
+              <WhatsAppIcon />
+              Share to WhatsApp
+            </a>
           </div>
         </header>
 
@@ -660,6 +684,14 @@ export default async function Page({ searchParams }: PageProps<"/">) {
 }
 
 /* ═══════════════════════════════ COMPONENTS ═══════════════════════════════ */
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
+      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35M12.05 21.5h-.01a9.43 9.43 0 0 1-4.8-1.31l-.35-.2-3.57.93.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.02c0-5.2 4.24-9.44 9.45-9.44 2.52 0 4.89.99 6.67 2.77a9.37 9.37 0 0 1 2.76 6.68c0 5.2-4.24 9.43-9.44 9.43m8.03-17.47A11.3 11.3 0 0 0 12.05.7C5.79.7.7 5.79.7 12.04c0 2 .52 3.95 1.52 5.67L.6 23.3l5.72-1.5a11.3 11.3 0 0 0 5.72 1.46h.01c6.25 0 11.34-5.09 11.35-11.34a11.27 11.27 0 0 0-3.32-8.02" />
+    </svg>
+  );
+}
 
 function TagBadge({ tag }: { tag: Tag }) {
   return (
