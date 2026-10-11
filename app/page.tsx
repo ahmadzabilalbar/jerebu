@@ -309,9 +309,12 @@ const SITE_URL =
   process.env.SITE_URL ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
 
-/** "IPU 🟢 Alor Setar 96 · 🟢 Kangar 92", shared by the link preview and the WhatsApp share button. */
-const ipuHeadline = (items: { name: string; ipu: number }[]) =>
-  `IPU ${items.map((n) => `${tagOf(n.ipu).dot} ${n.name} ${n.ipu}`).join(" · ")}`;
+/** "🟢 Alor Setar 96 · 🟢 Kangar 92", joined with `sep`. */
+const ipuDots = (items: { name: string; ipu: number }[], sep: string) =>
+  items.map((n) => `${tagOf(n.ipu).dot} ${n.name} ${n.ipu}`).join(sep);
+
+/** Link-preview title: "IPU 🟢 Alor Setar 96 · 🟢 Kangar 92". */
+const ipuHeadline = (items: { name: string; ipu: number }[]) => `IPU ${ipuDots(items, " · ")}`;
 
 /** Puts the current IPU into the shared-link title and image. No description, to keep previews short. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -411,11 +414,12 @@ export default async function Page({ searchParams }: PageProps<"/">) {
   const tableRows = [...series].reverse().filter((r) => !s.tag || tagOf(r.ipu).key === s.tag);
 
   const current = areaInfo.flatMap((a) => (a.ipu !== null ? [{ name: a.area.name, ipu: a.ipu }] : []));
+  // WhatsApp message: "🟢 Alor Setar 59 • 🔵 Kangar 49" / "IPU • 11 Oct 2026, 08:00 MYT" / link
   const shareText = [
-    current.length ? ipuHeadline(current) : "IPU Alor Setar · Kangar",
-    latestTime ? `Bacaan ${fmtDayTime(latestTime)} MYT` : null,
+    current.length ? ipuDots(current, " • ") : "Alor Setar • Kangar",
+    latestTime ? `IPU • ${fmt(latestTime, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} MYT` : "IPU",
     `${SITE_URL}/`,
-  ].filter(Boolean).join("\n");
+  ].join("\n");
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
   const href = (over: Partial<Search>) => {
